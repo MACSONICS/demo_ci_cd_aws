@@ -44,9 +44,9 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PUBLIC_KEY }}" > ~/.ssh/awsacademy.pub
-            - name: Terraform init
-              working-directory: terraform
-              run: terraform init
+      - name: Terraform init
+        working-directory: terraform
+        run: terraform init
 
       - name: Terraform apply
         working-directory: terraform
