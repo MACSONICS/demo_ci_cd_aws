@@ -1,5 +1,6 @@
 - hosts: web
   become: yes
+
   tasks:
     - name: Update apt cache
       apt:
@@ -7,7 +8,9 @@
 
     - name: Install Node.js and npm
       apt:
-        name: [nodejs, npm]
+        name:
+          - nodejs
+          - npm
         state: present
 
     - name: Install Nginx
@@ -15,36 +18,67 @@
         name: nginx
         state: present
 
-    - name: Copy app files
-      synchronize:
-        src: ../app/
-        dest: /var/www/app
-
-    - name: Install app dependencies
-      command: npm install
-      args:
-        chdir: /var/www/app
-
-    - name: Configure Nginx
+    - name: Copy application files
       copy:
-        dest: /etc/nginx/sites-available/default
+        src: ../app/
+        dest: /home/ubuntu/app/
+        owner: ubuntu
+        group: ubuntu
+        mode: '0755'
+
+    - name: Create systemd service for Node.js app
+      copy:
+        dest: /etc/systemd/system/new-key-app.service
+        content: |
+          [Unit]
+          Description=Node.js App Service
+          After=network.target
+
+          [Service]
+          ExecStart=/usr/bin/node /home/ubuntu/app/index.js
+          Restart=always
+          User=ubuntu
+          WorkingDirectory=/home/ubuntu/app
+          Environment=PORT=3000
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Reload systemd
+      systemd:
+        daemon_reload: yes
+
+    - name: Enable and start Node.js app
+      systemd:
+        name: new-key-app
+        enabled: yes
+        state: started
+
+    - name: Configure Nginx reverse proxy
+      copy:
+        dest: /etc/nginx/sites-available/new-key-app
         content: |
           server {
               listen 80;
               server_name _;
+
               location / {
-                  proxy_pass http://127.0.0.1:3000;
+                  proxy_pass http://localhost:3000;
+                  proxy_http_version 1.1;
+                  proxy_set_header Upgrade $http_upgrade;
+                  proxy_set_header Connection 'upgrade';
                   proxy_set_header Host $host;
-                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_cache_bypass $http_upgrade;
               }
           }
 
+    - name: Enable Nginx site
+      file:
+        src: /etc/nginx/sites-available/new-key-app
+        dest: /etc/nginx/sites-enabled/new-key-app
+        state: link
+
     - name: Restart Nginx
-      service:
+      systemd:
         name: nginx
         state: restarted
-
-    - name: Start Node.js app
-      command: npm start
-      args:
-        chdir: /var/www/app
