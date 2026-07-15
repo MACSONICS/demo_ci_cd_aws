@@ -1,8 +1,3 @@
-resource "aws_key_pair" "academy_key" {
-  key_name   = "academy-key"
-  public_key = file(var.public_key_path)
-}
-
 resource "aws_security_group" "web_sg" {
   name        = "web-sg"
   description = "Allow SSH and HTTP"
@@ -35,7 +30,7 @@ resource "aws_security_group" "web_sg" {
 resource "aws_instance" "web" {
   ami           = "ami-0e86e20dae9224db8" # Ubuntu 22.04 LTS (us-east-1)
   instance_type = var.instance_type
-  key_name      = aws_key_pair.academy_key.key_name
+  key_name      = "new-key"
   security_groups = [aws_security_group.web_sg.name]
 
   tags = {
