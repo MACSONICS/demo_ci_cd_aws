@@ -1,48 +1,27 @@
-name: CI-CD Workshop
+name: CI-CD Pipeline
 
 on:
   push:
     branches: [ "main" ]
 
 jobs:
-  ci:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: app
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "18"
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Run tests
-        run: npm test
-
-  cd:
-    needs: ci
+  deploy:
     runs-on: ubuntu-latest
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
       AWS_DEFAULT_REGION: us-east-1
+
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Create SSH key files
+      - name: Create private key file for Ansible
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/awsacademy.pem
-          chmod 600 ~/.ssh/awsacademy.pem
-        
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/new-key.pem
+          chmod 600 ~/.ssh/new-key.pem
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -51,17 +30,12 @@ jobs:
         working-directory: terraform
         run: terraform init
 
-      - name: Import key pair if it already exists
-        working-directory: terraform
-        run: |
-          terraform import aws_key_pair.academy_key academy-key || echo "Key pair not yet created"
-
       - name: Terraform apply
         working-directory: terraform
         run: terraform apply -auto-approve
 
-      - name: Get EC2 IP
-        id: tf-output
+      - name: Get EC2 public IP
+        id: tf-ip
         working-directory: terraform
         run: echo "ip=$(terraform output -raw ec2_public_ip)" >> $GITHUB_OUTPUT
 
@@ -75,7 +49,11 @@ jobs:
         working-directory: ansible
         run: |
           echo "[web]" > inventory
-          echo "${{ steps.tf-output.outputs.ip }} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/awsacademy" >> inventory
+          echo "${{ steps.tf-ip.outputs.ip }} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/new-key.pem" >> inventory
+
+      - name: Test SSH manually
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/new-key.pem ubuntu@${{ steps.tf-ip.outputs.ip }} "echo connected"
 
       - name: Run Ansible playbook
         working-directory: ansible
