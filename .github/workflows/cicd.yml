@@ -40,9 +40,9 @@ jobs:
       - name: Create SSH key files
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/awsacademy
-          chmod 600 ~/.ssh/awsacademy
-          echo "${{ secrets.SSH_PUBLIC_KEY }}" > ~/.ssh/awsacademy.pub
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/awsacademy.pem
+          chmod 600 ~/.ssh/awsacademy.pem
+        
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
