@@ -1,0 +1,50 @@
+- hosts: web
+  become: yes
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install Node.js and npm
+      apt:
+        name: [nodejs, npm]
+        state: present
+
+    - name: Install Nginx
+      apt:
+        name: nginx
+        state: present
+
+    - name: Copy app files
+      synchronize:
+        src: ../app/
+        dest: /var/www/app
+
+    - name: Install app dependencies
+      command: npm install
+      args:
+        chdir: /var/www/app
+
+    - name: Configure Nginx
+      copy:
+        dest: /etc/nginx/sites-available/default
+        content: |
+          server {
+              listen 80;
+              server_name _;
+              location / {
+                  proxy_pass http://127.0.0.1:3000;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+              }
+          }
+
+    - name: Restart Nginx
+      service:
+        name: nginx
+        state: restarted
+
+    - name: Start Node.js app
+      command: npm start
+      args:
+        chdir: /var/www/app

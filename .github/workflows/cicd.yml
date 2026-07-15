@@ -1,0 +1,5 @@
+- name: Add SSH key
+  run: |
+    mkdir -p ~/.ssh
+    echo "$SSH_PRIVATE_KEY" > ~/.ssh/awsacademy
+    chmod 600 ~/.ssh/awsacademy
